@@ -1,20 +1,29 @@
-global proxy_detect_table :table[addr] of set[string] = table();
+#check http sessions and if a source IP is related to three diffrent user-agents or more
+#output "xxx.xxx.xxx.xxx is a proxy" where xxx.xxx.xxx.xxx is the source IP
 
+global agts: table[addr] of set[string] = table();
 
-event http_header (c: connection, is_orig: bool, original_name: string, name: string, value: string){
-	if(c$http?$user_agent){
-		local src_ip=c$id$orig_h;
-		local user_agent=c$http$user_agent;
-		if(src_ip in proxy_detect_table)
-		add (proxy_detect_table[src_ip])[to_lower(user_agent)];
-	else
-		proxy_detect_table[src_ip]=set(user_agent);
-	}
-}
-event zeek_done()
+event http_entity_data(c:connection,is_orig:bool,length:count,data:string) 
 {
-	for (src_ip in proxy_detect_table){
-	if(|proxy_detect_table[src_ip]|>=3)
-		print fmt("%s is a proxy",src_ip);
-	}
+	local sip: addr = c$id$orig_h;
+	local agt: string = c$http$user_agent;
+        if (sip in agts) 
+        {
+            add (agts[sip])[agt];
+        } 
+        else 
+        {
+            agts[sip] = set(agt);
+        }
+}
+
+event zeek_done() 
+{
+    for (i in agts) 
+    {
+        if (|agts[i]| >= 3) 
+        {
+            print(i+" is a proxy");
+        }
+    }
 }
